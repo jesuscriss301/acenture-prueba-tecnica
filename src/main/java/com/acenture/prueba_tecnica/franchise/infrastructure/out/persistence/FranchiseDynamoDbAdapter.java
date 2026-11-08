@@ -32,4 +32,12 @@ public class FranchiseDynamoDbAdapter implements FranchiseRepositoryPort {
         return Mono.fromFuture(() -> table.putItem(request))
                 .thenReturn(franchise);
     }
+
+    @Override
+    public Mono<Boolean> existsById(String franchiseId) {
+        return Mono.fromFuture(() -> table.getItem(
+                        DynamoDbKeys.key(DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.METADATA)))
+                .map(item -> true)
+                .defaultIfEmpty(false);
+    }
 }

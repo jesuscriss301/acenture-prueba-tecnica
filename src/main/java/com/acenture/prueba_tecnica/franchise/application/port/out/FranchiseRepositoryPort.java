@@ -10,4 +10,6 @@ import reactor.core.publisher.Mono;
 public interface FranchiseRepositoryPort {
 
     Mono<Franchise> save(Franchise franchise);
+
+    Mono<Boolean> existsById(String franchiseId);
 }
