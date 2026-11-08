@@ -4,6 +4,8 @@ import com.acenture.prueba_tecnica.product.application.port.in.AddProductUseCase
 import com.acenture.prueba_tecnica.product.application.port.in.AddProductUseCase.AddProductCommand;
 import com.acenture.prueba_tecnica.product.application.port.in.DeleteProductUseCase;
 import com.acenture.prueba_tecnica.product.application.port.in.DeleteProductUseCase.DeleteProductCommand;
+import com.acenture.prueba_tecnica.product.application.port.in.RenameProductUseCase;
+import com.acenture.prueba_tecnica.product.application.port.in.RenameProductUseCase.RenameProductCommand;
 import com.acenture.prueba_tecnica.product.application.port.in.UpdateProductStockUseCase;
 import com.acenture.prueba_tecnica.product.application.port.in.UpdateProductStockUseCase.UpdateProductStockCommand;
 import com.acenture.prueba_tecnica.product.domain.model.Product;
@@ -11,6 +13,7 @@ import com.acenture.prueba_tecnica.product.infrastructure.in.web.dto.AddProductR
 import com.acenture.prueba_tecnica.product.infrastructure.in.web.dto.ProductResponse;
 import com.acenture.prueba_tecnica.product.infrastructure.in.web.dto.UpdateStockRequest;
 import com.acenture.prueba_tecnica.shared.domain.exception.DomainValidationException;
+import com.acenture.prueba_tecnica.shared.infrastructure.web.dto.RenameRequest;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -25,13 +28,16 @@ public class ProductHandler {
     private final AddProductUseCase addProductUseCase;
     private final DeleteProductUseCase deleteProductUseCase;
     private final UpdateProductStockUseCase updateProductStockUseCase;
+    private final RenameProductUseCase renameProductUseCase;
 
     public ProductHandler(AddProductUseCase addProductUseCase,
                           DeleteProductUseCase deleteProductUseCase,
-                          UpdateProductStockUseCase updateProductStockUseCase) {
+                          UpdateProductStockUseCase updateProductStockUseCase,
+                          RenameProductUseCase renameProductUseCase) {
         this.addProductUseCase = addProductUseCase;
         this.deleteProductUseCase = deleteProductUseCase;
         this.updateProductStockUseCase = updateProductStockUseCase;
+        this.renameProductUseCase = renameProductUseCase;
     }
 
     public Mono<ServerResponse> add(ServerRequest request) {
@@ -64,6 +70,17 @@ public class ProductHandler {
                 .switchIfEmpty(Mono.error(new DomainValidationException("El cuerpo de la petición es obligatorio")))
                 .map(body -> new UpdateProductStockCommand(franchiseId, branchId, productId, body.stock()))
                 .flatMap(updateProductStockUseCase::updateStock)
+                .flatMap(ProductHandler::ok);
+    }
+
+    public Mono<ServerResponse> rename(ServerRequest request) {
+        String franchiseId = request.pathVariable("franchiseId");
+        String branchId = request.pathVariable("branchId");
+        String productId = request.pathVariable("productId");
+        return request.bodyToMono(RenameRequest.class)
+                .switchIfEmpty(Mono.error(new DomainValidationException("El cuerpo de la petición es obligatorio")))
+                .map(body -> new RenameProductCommand(franchiseId, branchId, productId, body.name()))
+                .flatMap(renameProductUseCase::rename)
                 .flatMap(ProductHandler::ok);
     }
 

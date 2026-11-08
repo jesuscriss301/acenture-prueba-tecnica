@@ -19,7 +19,8 @@ public class ProductRouter {
         return ApiErrorResponses.withErrorHandling(RouterFunctions.route()
                 .POST(PRODUCTS_PATH, handler::add)
                 .DELETE(PRODUCT_PATH, handler::delete)
-                .PATCH(PRODUCT_PATH + "/stock", handler::updateStock));
+                .PATCH(PRODUCT_PATH + "/stock", handler::updateStock)
+                .PATCH(PRODUCT_PATH + "/name", handler::rename));
     }
 
     @Bean

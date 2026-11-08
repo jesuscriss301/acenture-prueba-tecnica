@@ -39,4 +39,8 @@ public record Product(String id, String franchiseId, String branchId, String nam
     public Product withStock(Integer newStock) {
         return new Product(id, franchiseId, branchId, name, Validations.requireStock(newStock));
     }
+
+    public Product rename(String newName) {
+        return new Product(id, franchiseId, branchId, newName, stock);
+    }
 }
