@@ -15,11 +15,12 @@ API REST **reactiva** para administrar franquicias, sus sucursales y los product
 5. [Endpoints](#endpoints)
 6. [Reglas de negocio y decisiones de diseño](#reglas-de-negocio-y-decisiones-de-diseño)
 7. [Cómo ejecutar en local](#cómo-ejecutar-en-local)
-8. [Infraestructura como código (Terraform)](#infraestructura-como-código-terraform)
-9. [Pruebas](#pruebas)
-10. [Documentación OpenAPI](#documentación-openapi)
-11. [Flujo de trabajo con Git](#flujo-de-trabajo-con-git)
-12. [Estado de los criterios de la prueba](#estado-de-los-criterios-de-la-prueba)
+8. [Arquitectura en AWS](#arquitectura-en-aws)
+9. [Infraestructura como código (Terraform)](#infraestructura-como-código-terraform)
+10. [Pruebas](#pruebas)
+11. [Documentación OpenAPI](#documentación-openapi)
+12. [Flujo de trabajo con Git](#flujo-de-trabajo-con-git)
+13. [Estado de los criterios de la prueba](#estado-de-los-criterios-de-la-prueba)
 
 ---
 
@@ -460,6 +461,164 @@ La API queda disponible en `http://localhost:8080`.
 
 ---
 
+## Arquitectura en AWS
+
+Toda la solución corre en **AWS, región `us-east-2` (Ohio)**, y se crea con Terraform (`infra/`).
+
+| Servicio | Uso |
+|---|---|
+| **Amazon EC2** (`t3.micro`, Amazon Linux 2023) | Servidor donde corre el contenedor Docker de la API |
+| **Amazon DynamoDB** | Base de datos: tabla única `franchises` |
+| **AWS IAM** | Rol de la instancia con permisos mínimos sobre la tabla |
+| **Amazon VPC** | VPC por defecto, subred pública y Security Group |
+| **AWS Systems Manager** (Session Manager) | Acceso administrativo a la instancia sin SSH |
+
+### Vista general
+
+```mermaid
+flowchart LR
+    Client(["Cliente<br/>Swagger / curl / Postman"])
+    Dev(["Desarrollador"])
+    GH["GitHub<br/>repositorio público"]
+
+    subgraph AWS["☁️ AWS Cloud · us-east-2"]
+        IGW["Internet Gateway"]
+
+        subgraph VPC["VPC por defecto · 172.31.0.0/16"]
+            subgraph SUBNET["Subred pública"]
+                SG{{"Security Group<br/>entrada: solo TCP 8080"}}
+                subgraph EC2["EC2 t3.micro · Amazon Linux 2023 · EBS cifrado"]
+                    DOCKER["Docker Engine"]
+                    subgraph CONT["Contenedor franchise-api"]
+                        APP["Spring Boot WebFlux<br/>Netty :8080"]
+                    end
+                    IMDS["IMDSv2<br/>credenciales temporales"]
+                end
+            end
+        end
+
+        subgraph IAM["IAM"]
+            PROFILE["Instance Profile"]
+            ROLE["Rol franchise-api-ec2-role"]
+        end
+
+        DDB[("DynamoDB<br/>tabla franchises<br/>PK / SK · cifrada")]
+        SSM["Systems Manager<br/>Session Manager"]
+    end
+
+    Client -- "HTTP :8080" --> IGW --> SG --> APP
+    DOCKER --- CONT
+    APP -- "obtiene credenciales" --> IMDS
+    IMDS -. "asume" .-> ROLE
+    PROFILE --- ROLE
+    APP -- "SDK async · HTTPS" --> DDB
+    EC2 -- "agente SSM" --> SSM
+    GH -- "git clone al arrancar" --> EC2
+    Dev -- "terraform apply" --> AWS
+```
+
+### Aprovisionamiento y despliegue
+
+Con un solo `terraform apply` se crea la infraestructura y la instancia se despliega sola al arrancar (*user data*):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Desarrollador
+    participant TF as Terraform
+    participant AWS as APIs de AWS
+    participant EC2 as Instancia EC2
+    participant GH as GitHub
+    participant API as Contenedor API
+
+    Dev->>TF: terraform apply
+    TF->>AWS: Crear tabla DynamoDB franchises
+    TF->>AWS: Crear rol IAM, política e instance profile
+    TF->>AWS: Crear Security Group (TCP 8080)
+    TF->>AWS: Crear instancia EC2 con user data
+    AWS-->>TF: IDs, ARN e IP pública
+    TF-->>Dev: Outputs: api_url y swagger_url
+
+    Note over EC2: Arranque (cloud-init)
+    EC2->>EC2: Crear swap de 2 GB
+    EC2->>EC2: Instalar Docker y Git
+    EC2->>GH: git clone del repositorio
+    EC2->>EC2: docker build (Maven compila y corre las 90 pruebas)
+    EC2->>API: docker run -p 8080:8080 --restart unless-stopped
+    API-->>EC2: Netty started on port 8080
+```
+
+### Flujo de una petición en AWS
+
+Ejemplo: `GET /api/franchises/{id}/top-stock-products`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Cliente
+    participant SG as Security Group
+    participant API as API (contenedor en EC2)
+    participant IMDS as IMDSv2
+    participant DDB as DynamoDB
+
+    C->>SG: HTTP GET :8080/api/franchises/{id}/top-stock-products
+    SG->>API: Permitido (regla TCP 8080)
+    opt Primera llamada o credenciales por vencer
+        API->>IMDS: PUT token (IMDSv2) + GET credenciales del rol
+        IMDS-->>API: Credenciales temporales (renovación automática)
+    end
+    API->>DDB: GetItem PK=FRANCHISE#id, SK=METADATA
+    DDB-->>API: Franquicia existe
+    API->>DDB: Query PK=FRANCHISE#id, SK begins_with BRANCH#
+    DDB-->>API: Sucursales y productos (una sola partición)
+    API->>API: groupBy sucursal + reduce mayor stock
+    API-->>C: 200 OK · lista JSON
+```
+
+### Seguridad e IAM
+
+```mermaid
+flowchart TB
+    subgraph TRUST["Política de confianza"]
+        EC2SVC["ec2.amazonaws.com"]
+    end
+
+    ROLE["Rol IAM<br/>franchise-api-ec2-role"]
+
+    subgraph PERMS["Permisos del rol"]
+        P1["Política en línea · mínimo privilegio<br/>dynamodb:GetItem · PutItem · UpdateItem<br/>DeleteItem · Query"]
+        P2["AmazonSSMManagedInstanceCore<br/>(Session Manager)"]
+    end
+
+    TABLE[("arn:aws:dynamodb:us-east-2:…:table/franchises")]
+
+    EC2SVC -- "sts:AssumeRole" --> ROLE
+    ROLE --> P1
+    ROLE --> P2
+    P1 -- "solo este recurso" --> TABLE
+```
+
+| Capa | Control |
+|---|---|
+| Credenciales | Sin claves de acceso en el código ni en el contenedor: rol IAM + credenciales temporales vía **IMDSv2** (obligatorio, `hop limit 2` para Docker) |
+| Permisos | **Mínimo privilegio**: 5 acciones de DynamoDB sobre una sola tabla |
+| Red | Security Group con solo el puerto `8080` abierto; **sin SSH** (administración por Session Manager) |
+| Datos en reposo | Disco EBS cifrado y tabla DynamoDB con cifrado del lado del servidor |
+| Repositorio | `terraform.tfstate` y `*.tfvars` excluidos en `.gitignore` |
+| Contenedor | La API corre con un usuario sin privilegios dentro de la imagen |
+
+### Costos
+
+| Recurso | Costo estimado |
+|---|---|
+| DynamoDB (provisionado 5/5, &lt; 25 GB) | Dentro del nivel gratuito permanente de AWS |
+| EC2 `t3.micro` + 20 GB gp3 | Unos USD 8–10 al mes (cubierto por créditos del plan gratuito) |
+| IAM, Security Group, Session Manager | Sin costo |
+
+Para eliminar todos los recursos: `terraform destroy` desde `infra/`.
+
+---
+
 ## Infraestructura como código (Terraform)
 
 La carpeta [`infra/`](infra) crea **toda la solución en AWS**: la base de datos y el servidor donde corre la API.
@@ -472,25 +631,7 @@ La carpeta [`infra/`](infra) crea **toda la solución en AWS**: la base de datos
 | `compute.tf` | `aws_security_group.api` | Solo el puerto `8080` abierto (configurable con `allowed_cidr`); sin SSH |
 | `main.tf` | `aws_iam_user.app` (opcional) | Usuario con clave de acceso, solo si la API se ejecuta **fuera** de AWS (`create_app_user=true`) |
 
-```mermaid
-flowchart LR
-    U(["Usuario"]) -- "HTTP :8080" --> SG
-
-    subgraph AWS["AWS · us-east-2"]
-        subgraph VPC["VPC por defecto"]
-            SG["Security Group<br/>solo :8080"] --> EC2
-            subgraph EC2["EC2 t3.micro · Amazon Linux 2023"]
-                C["Contenedor Docker<br/>Franchise API"]
-            end
-        end
-        ROLE["IAM Role<br/>solo tabla franchises"]
-        DB[("DynamoDB<br/>franchises")]
-    end
-
-    GH["GitHub<br/>repositorio público"] -- "git clone + docker build<br/>(al arrancar)" --> EC2
-    EC2 -. "instance profile" .- ROLE
-    C -- "SDK AWS async<br/>credenciales del rol" --> DB
-```
+Los diagramas de la infraestructura resultante están en [Arquitectura en AWS](#arquitectura-en-aws).
 
 **Seguridad:** la API **no usa claves de acceso** en AWS. La instancia tiene un rol IAM y el SDK obtiene credenciales temporales automáticamente (IMDSv2 obligatorio). El disco está cifrado y no hay puerto SSH abierto; para entrar a la instancia se usa Session Manager.
 
