@@ -4,8 +4,12 @@ import com.acenture.prueba_tecnica.product.application.port.in.AddProductUseCase
 import com.acenture.prueba_tecnica.product.application.port.in.AddProductUseCase.AddProductCommand;
 import com.acenture.prueba_tecnica.product.application.port.in.DeleteProductUseCase;
 import com.acenture.prueba_tecnica.product.application.port.in.DeleteProductUseCase.DeleteProductCommand;
+import com.acenture.prueba_tecnica.product.application.port.in.UpdateProductStockUseCase;
+import com.acenture.prueba_tecnica.product.application.port.in.UpdateProductStockUseCase.UpdateProductStockCommand;
+import com.acenture.prueba_tecnica.product.domain.model.Product;
 import com.acenture.prueba_tecnica.product.infrastructure.in.web.dto.AddProductRequest;
 import com.acenture.prueba_tecnica.product.infrastructure.in.web.dto.ProductResponse;
+import com.acenture.prueba_tecnica.product.infrastructure.in.web.dto.UpdateStockRequest;
 import com.acenture.prueba_tecnica.shared.domain.exception.DomainValidationException;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -20,10 +24,14 @@ public class ProductHandler {
 
     private final AddProductUseCase addProductUseCase;
     private final DeleteProductUseCase deleteProductUseCase;
+    private final UpdateProductStockUseCase updateProductStockUseCase;
 
-    public ProductHandler(AddProductUseCase addProductUseCase, DeleteProductUseCase deleteProductUseCase) {
+    public ProductHandler(AddProductUseCase addProductUseCase,
+                          DeleteProductUseCase deleteProductUseCase,
+                          UpdateProductStockUseCase updateProductStockUseCase) {
         this.addProductUseCase = addProductUseCase;
         this.deleteProductUseCase = deleteProductUseCase;
+        this.updateProductStockUseCase = updateProductStockUseCase;
     }
 
     public Mono<ServerResponse> add(ServerRequest request) {
@@ -46,5 +54,22 @@ public class ProductHandler {
                 request.pathVariable("productId"));
         return deleteProductUseCase.delete(command)
                 .then(ServerResponse.noContent().build());
+    }
+
+    public Mono<ServerResponse> updateStock(ServerRequest request) {
+        String franchiseId = request.pathVariable("franchiseId");
+        String branchId = request.pathVariable("branchId");
+        String productId = request.pathVariable("productId");
+        return request.bodyToMono(UpdateStockRequest.class)
+                .switchIfEmpty(Mono.error(new DomainValidationException("El cuerpo de la petición es obligatorio")))
+                .map(body -> new UpdateProductStockCommand(franchiseId, branchId, productId, body.stock()))
+                .flatMap(updateProductStockUseCase::updateStock)
+                .flatMap(ProductHandler::ok);
+    }
+
+    private static Mono<ServerResponse> ok(Product product) {
+        return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(ProductResponse.from(product));
     }
 }

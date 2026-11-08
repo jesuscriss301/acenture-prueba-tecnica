@@ -17,6 +17,7 @@ public class ProductRouter {
     public RouterFunction<ServerResponse> productRoutes(ProductHandler handler) {
         return ApiErrorResponses.withErrorHandling(RouterFunctions.route()
                 .POST(PRODUCTS_PATH, handler::add)
-                .DELETE(PRODUCT_PATH, handler::delete));
+                .DELETE(PRODUCT_PATH, handler::delete)
+                .PATCH(PRODUCT_PATH + "/stock", handler::updateStock));
     }
 }

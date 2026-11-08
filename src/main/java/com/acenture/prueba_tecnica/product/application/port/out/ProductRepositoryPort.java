@@ -10,6 +10,13 @@ public interface ProductRepositoryPort {
 
     Mono<Product> save(Product product);
 
+    Mono<Product> findById(String franchiseId, String branchId, String productId);
+
+    /**
+     * Reemplaza un producto existente.
+     */
+    Mono<Product> update(Product product);
+
     /**
      * Elimina el producto y lo devuelve. Vacío si no existía.
      */

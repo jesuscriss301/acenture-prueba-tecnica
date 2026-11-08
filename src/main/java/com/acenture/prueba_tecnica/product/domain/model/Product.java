@@ -21,4 +21,8 @@ public record Product(String id, String franchiseId, String branchId, String nam
         return new Product(UUID.randomUUID().toString(), franchiseId, branchId, name,
                 Validations.requireStock(stock));
     }
+
+    public Product withStock(Integer newStock) {
+        return new Product(id, franchiseId, branchId, name, Validations.requireStock(newStock));
+    }
 }

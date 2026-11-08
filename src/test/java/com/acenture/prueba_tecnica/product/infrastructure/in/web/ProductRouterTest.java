@@ -2,6 +2,7 @@ package com.acenture.prueba_tecnica.product.infrastructure.in.web;
 
 import com.acenture.prueba_tecnica.product.application.port.in.AddProductUseCase;
 import com.acenture.prueba_tecnica.product.application.port.in.DeleteProductUseCase;
+import com.acenture.prueba_tecnica.product.application.port.in.UpdateProductStockUseCase;
 import com.acenture.prueba_tecnica.product.domain.model.Product;
 import com.acenture.prueba_tecnica.shared.domain.exception.DomainValidationException;
 import com.acenture.prueba_tecnica.shared.domain.exception.ResourceNotFoundException;
@@ -21,13 +22,16 @@ class ProductRouterTest {
 
     private AddProductUseCase addProductUseCase;
     private DeleteProductUseCase deleteProductUseCase;
+    private UpdateProductStockUseCase updateProductStockUseCase;
     private WebTestClient client;
 
     @BeforeEach
     void setUp() {
         addProductUseCase = mock(AddProductUseCase.class);
         deleteProductUseCase = mock(DeleteProductUseCase.class);
-        ProductHandler handler = new ProductHandler(addProductUseCase, deleteProductUseCase);
+        updateProductStockUseCase = mock(UpdateProductStockUseCase.class);
+        ProductHandler handler = new ProductHandler(
+                addProductUseCase, deleteProductUseCase, updateProductStockUseCase);
         client = WebTestClient.bindToRouterFunction(new ProductRouter().productRoutes(handler)).build();
     }
 
@@ -77,5 +81,19 @@ class ProductRouterTest {
         client.delete().uri(PRODUCTS_URI + "/p-x")
                 .exchange()
                 .expectStatus().isNotFound();
+    }
+
+    @Test
+    void patchStockShouldReturn200WithUpdatedProduct() {
+        when(updateProductStockUseCase.updateStock(any()))
+                .thenReturn(Mono.just(new Product("p-1", "f-1", "b-1", "Café", 42)));
+
+        client.patch().uri(PRODUCTS_URI + "/p-1/stock")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"stock\":42}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.stock").isEqualTo(42);
     }
 }
