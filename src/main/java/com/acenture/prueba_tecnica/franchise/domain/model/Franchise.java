@@ -19,4 +19,8 @@ public record Franchise(String id, String name) {
     public static Franchise create(String name) {
         return new Franchise(UUID.randomUUID().toString(), name);
     }
+
+    public Franchise rename(String newName) {
+        return new Franchise(id, newName);
+    }
 }

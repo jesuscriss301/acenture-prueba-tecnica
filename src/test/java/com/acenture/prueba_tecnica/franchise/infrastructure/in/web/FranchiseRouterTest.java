@@ -1,8 +1,10 @@
 package com.acenture.prueba_tecnica.franchise.infrastructure.in.web;
 
 import com.acenture.prueba_tecnica.franchise.application.port.in.CreateFranchiseUseCase;
+import com.acenture.prueba_tecnica.franchise.application.port.in.RenameFranchiseUseCase;
 import com.acenture.prueba_tecnica.franchise.domain.model.Franchise;
 import com.acenture.prueba_tecnica.shared.domain.exception.DomainValidationException;
+import com.acenture.prueba_tecnica.shared.domain.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -16,12 +18,14 @@ import static org.mockito.Mockito.when;
 class FranchiseRouterTest {
 
     private CreateFranchiseUseCase createFranchiseUseCase;
+    private RenameFranchiseUseCase renameFranchiseUseCase;
     private WebTestClient client;
 
     @BeforeEach
     void setUp() {
         createFranchiseUseCase = mock(CreateFranchiseUseCase.class);
-        FranchiseHandler handler = new FranchiseHandler(createFranchiseUseCase);
+        renameFranchiseUseCase = mock(RenameFranchiseUseCase.class);
+        FranchiseHandler handler = new FranchiseHandler(createFranchiseUseCase, renameFranchiseUseCase);
         client = WebTestClient.bindToRouterFunction(new FranchiseRouter().franchiseRoutes(handler)).build();
     }
 
@@ -65,5 +69,31 @@ class FranchiseRouterTest {
                 .expectStatus().isBadRequest()
                 .expectBody()
                 .jsonPath("$.code").isEqualTo("BAD_REQUEST");
+    }
+
+    @Test
+    void patchNameShouldReturn200() {
+        when(renameFranchiseUseCase.rename(any()))
+                .thenReturn(Mono.just(new Franchise("abc-123", "Franquicia Sur")));
+
+        client.patch().uri(FranchiseRouter.BASE_PATH + "/abc-123/name")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"Franquicia Sur\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.name").isEqualTo("Franquicia Sur");
+    }
+
+    @Test
+    void patchNameShouldReturn404WhenFranchiseDoesNotExist() {
+        when(renameFranchiseUseCase.rename(any()))
+                .thenReturn(Mono.error(new ResourceNotFoundException("La franquicia f-x no existe")));
+
+        client.patch().uri(FranchiseRouter.BASE_PATH + "/f-x/name")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"Franquicia Sur\"}")
+                .exchange()
+                .expectStatus().isNotFound();
     }
 }

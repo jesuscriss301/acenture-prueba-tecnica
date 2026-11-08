@@ -15,6 +15,7 @@ public class FranchiseRouter {
     @Bean
     public RouterFunction<ServerResponse> franchiseRoutes(FranchiseHandler handler) {
         return ApiErrorResponses.withErrorHandling(RouterFunctions.route()
-                .POST(BASE_PATH, handler::create));
+                .POST(BASE_PATH, handler::create)
+                .PATCH(BASE_PATH + "/{franchiseId}/name", handler::rename));
     }
 }

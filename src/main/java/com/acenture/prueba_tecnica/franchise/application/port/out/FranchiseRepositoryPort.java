@@ -12,4 +12,11 @@ public interface FranchiseRepositoryPort {
     Mono<Franchise> save(Franchise franchise);
 
     Mono<Boolean> existsById(String franchiseId);
+
+    Mono<Franchise> findById(String franchiseId);
+
+    /**
+     * Reemplaza una franquicia existente.
+     */
+    Mono<Franchise> update(Franchise franchise);
 }

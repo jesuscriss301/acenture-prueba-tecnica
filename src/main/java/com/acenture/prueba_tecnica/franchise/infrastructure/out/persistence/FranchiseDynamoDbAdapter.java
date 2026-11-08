@@ -35,9 +35,29 @@ public class FranchiseDynamoDbAdapter implements FranchiseRepositoryPort {
 
     @Override
     public Mono<Boolean> existsById(String franchiseId) {
-        return Mono.fromFuture(() -> table.getItem(
-                        DynamoDbKeys.key(DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.METADATA)))
+        return findItem(franchiseId)
                 .map(item -> true)
                 .defaultIfEmpty(false);
+    }
+
+    @Override
+    public Mono<Franchise> findById(String franchiseId) {
+        return findItem(franchiseId).map(FranchiseItemMapper::toDomain);
+    }
+
+    @Override
+    public Mono<Franchise> update(Franchise franchise) {
+        PutItemEnhancedRequest<CatalogItem> request = PutItemEnhancedRequest.builder(CatalogItem.class)
+                .item(FranchiseItemMapper.toItem(franchise))
+                .conditionExpression(DynamoDbKeys.ITEM_MUST_EXIST)
+                .build();
+
+        return Mono.fromFuture(() -> table.putItem(request))
+                .thenReturn(franchise);
+    }
+
+    private Mono<CatalogItem> findItem(String franchiseId) {
+        return Mono.fromFuture(() -> table.getItem(
+                DynamoDbKeys.key(DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.METADATA)));
     }
 }
