@@ -192,7 +192,7 @@ Las excepciones se traducen en un único lugar (`ApiErrorResponses.withErrorHand
 ## Estructura del proyecto
 
 ```text
-src/main/java/com/acenture/prueba_tecnica
+src/main/java/com/accenture/franchiseapi
 ├── franchise
 │   ├── domain/model/                 Franchise
 │   ├── application
@@ -475,7 +475,7 @@ AWS_PROFILE=<tu-perfil> AWS_REGION=us-east-2 ./mvnw spring-boot:run
 
 ```bash
 ./mvnw clean package
-java -jar target/demo-0.0.1-SNAPSHOT.jar
+java -jar target/franchise-api-0.0.1-SNAPSHOT.jar
 ```
 
 La API queda disponible en `http://localhost:8080`.
@@ -701,15 +701,18 @@ Para eliminar todo: `terraform destroy`.
 .\mvnw.cmd test      # Windows
 ```
 
-Las pruebas son **unitarias** y no necesitan AWS ni DynamoDB (los puertos se reemplazan con mocks).
+Las pruebas unitarias no necesitan AWS ni DynamoDB (los puertos se reemplazan con mocks). Las de integración usan DynamoDB Local en un contenedor y solo se ejecutan si hay Docker disponible.
 
 **Cobertura:** al ejecutar las pruebas, JaCoCo genera el reporte en `target/site/jacoco/index.html`.
 
-| Capa | Herramientas | Qué se prueba |
+| Tipo | Herramientas | Qué se prueba |
 |---|---|---|
 | Dominio | JUnit 5, AssertJ | Validaciones de `Franchise` y `Product` |
 | Casos de uso | Mockito, `StepVerifier` | Lógica de cada servicio: éxito, 404, validaciones, errores del repositorio, que no se consulte la base si los datos son inválidos |
 | Web | `WebTestClient` | Códigos HTTP, cuerpo JSON, encabezado `Location`, formato de errores, JSON inválido |
+| Arquitectura | ArchUnit (`ArchitectureTest`) | El dominio no depende de frameworks ni de otras capas; la aplicación no depende de infraestructura; cada adaptador implementa un puerto de salida y cada servicio un puerto de entrada; los módulos solo se usan entre sí por sus puertos |
+| Documentación | `@SpringBootTest` + `WebTestClient` (`OpenApiDocumentationTest`) | La app levanta, sirve `openapi.yaml` y Swagger UI apunta a ese contrato |
+| Integración | Testcontainers + DynamoDB Local (`DynamoDbAdaptersIntegrationTest`) | Los adaptadores reales contra DynamoDB: claves de la tabla única, escrituras condicionales, consultas por partición y aislamiento entre franquicias. **Se omiten automáticamente si no hay Docker.** |
 
 Cobertura por endpoint:
 
@@ -725,7 +728,7 @@ Cobertura por endpoint:
 | Renombrar sucursal | 8 |
 | Renombrar producto | 8 |
 
-**Resultado:** `Tests run: 90, Failures: 0, Errors: 0, Skipped: 0` — **BUILD SUCCESS**. El total incluye las ejecuciones de las pruebas parametrizadas y la prueba de arranque del contexto de Spring (`DemoApplicationTests`).
+Las pruebas unitarias de los endpoints suman **90 ejecuciones** (incluye pruebas parametrizadas y la prueba de arranque `FranchiseApiApplicationTests`), a las que se suman las de arquitectura, documentación e integración.
 
 ---
 

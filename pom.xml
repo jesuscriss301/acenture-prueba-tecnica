@@ -8,8 +8,8 @@
 		<version>4.1.2</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.acenture</groupId>
-	<artifactId>demo</artifactId>
+	<groupId>com.accenture</groupId>
+	<artifactId>franchise-api</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>franchise-api</name>
 	<description>API reactiva para la gestion de franquicias, sucursales y productos</description>
@@ -115,7 +115,7 @@
 				<configuration>
 					<excludes>
 						<!-- Clase de arranque de Spring Boot -->
-						<exclude>**/DemoApplication.class</exclude>
+						<exclude>**/FranchiseApiApplication.class</exclude>
 					</excludes>
 				</configuration>
 				<executions>
