@@ -9,4 +9,6 @@ import reactor.core.publisher.Mono;
 public interface BranchRepositoryPort {
 
     Mono<Branch> save(Branch branch);
+
+    Mono<Boolean> existsById(String franchiseId, String branchId);
 }

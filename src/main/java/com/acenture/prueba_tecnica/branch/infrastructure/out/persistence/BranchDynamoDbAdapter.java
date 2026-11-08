@@ -28,4 +28,12 @@ public class BranchDynamoDbAdapter implements BranchRepositoryPort {
         return Mono.fromFuture(() -> table.putItem(request))
                 .thenReturn(branch);
     }
+
+    @Override
+    public Mono<Boolean> existsById(String franchiseId, String branchId) {
+        return Mono.fromFuture(() -> table.getItem(
+                        DynamoDbKeys.key(DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.branchSk(branchId))))
+                .map(item -> true)
+                .defaultIfEmpty(false);
+    }
 }
