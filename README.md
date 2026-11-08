@@ -15,10 +15,11 @@ API REST **reactiva** para administrar franquicias, sus sucursales y los product
 5. [Endpoints](#endpoints)
 6. [Reglas de negocio y decisiones de diseño](#reglas-de-negocio-y-decisiones-de-diseño)
 7. [Cómo ejecutar en local](#cómo-ejecutar-en-local)
-8. [Pruebas](#pruebas)
-9. [Documentación OpenAPI](#documentación-openapi)
-10. [Flujo de trabajo con Git](#flujo-de-trabajo-con-git)
-11. [Estado de los criterios de la prueba](#estado-de-los-criterios-de-la-prueba)
+8. [Infraestructura como código (Terraform)](#infraestructura-como-código-terraform)
+9. [Pruebas](#pruebas)
+10. [Documentación OpenAPI](#documentación-openapi)
+11. [Flujo de trabajo con Git](#flujo-de-trabajo-con-git)
+12. [Estado de los criterios de la prueba](#estado-de-los-criterios-de-la-prueba)
 
 ---
 
@@ -33,6 +34,8 @@ API REST **reactiva** para administrar franquicias, sus sucursales y los product
 | JUnit 5, Mockito, AssertJ, `StepVerifier`, `WebTestClient` | Pruebas unitarias |
 | springdoc-openapi (Swagger UI) | Documentación de la API |
 | Maven (wrapper incluido) | Construcción, empaquetado como **JAR** ejecutable |
+| Docker / Docker Compose | Imagen de la API y entorno local con DynamoDB Local |
+| Terraform | Infraestructura como código: tabla DynamoDB y usuario IAM de la aplicación |
 
 ---
 
@@ -192,6 +195,10 @@ src/main/java/com/acenture/prueba_tecnica
 src/main/resources
 ├── application.properties
 └── static/openapi.yaml               Contrato OpenAPI 3
+
+infra/                                Terraform: tabla DynamoDB + usuario IAM de la app
+Dockerfile                            Imagen en dos etapas (compila + JRE liviano)
+docker-compose.yml                    DynamoDB Local + creación de tabla + API
 ```
 
 ---
@@ -359,10 +366,37 @@ flowchart TD
 
 ## Cómo ejecutar en local
 
-### Requisitos
+### Opción recomendada — Docker Compose (un solo comando)
+
+Solo requiere **Docker**. No necesita Java, Maven ni cuenta de AWS.
+
+```bash
+docker compose up --build
+```
+
+Esto levanta tres servicios:
+
+```mermaid
+flowchart LR
+    DB[("dynamodb<br/>DynamoDB Local :8000")]
+    INIT["init-table<br/>crea la tabla franchises"]
+    API["api<br/>Franchise API :8080"]
+    INIT -- "1. espera y crea tabla" --> DB
+    INIT -- "2. termina OK" --> API
+    API -- "3. lee y escribe" --> DB
+```
+
+- API: `http://localhost:8080`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+
+La imagen de la API (`Dockerfile`) se construye en dos etapas: la primera compila **y ejecuta las pruebas unitarias** con Maven; la segunda copia solo el JAR sobre una imagen `eclipse-temurin:21-jre-alpine` y lo ejecuta con un usuario sin privilegios.
+
+Para detener todo: `docker compose down`.
+
+### Requisitos para ejecutar sin Docker
 
 - **JDK 21** (por ejemplo, Eclipse Temurin) con `JAVA_HOME` configurado.
-- Una tabla de DynamoDB: en AWS o con **DynamoDB Local** (requiere Docker).
+- Una tabla de DynamoDB: en AWS o con **DynamoDB Local**.
 - No hace falta instalar Maven: el proyecto incluye el wrapper (`mvnw` / `mvnw.cmd`).
 
 ### Variables de configuración
@@ -376,7 +410,7 @@ flowchart TD
 
 Las credenciales se toman de la cadena estándar del SDK de AWS (variables de entorno, perfil, `aws login`, rol IAM). **Nunca se guardan en el repositorio.**
 
-### Opción A — DynamoDB Local (sin cuenta de AWS)
+### Opción A — DynamoDB Local sin Docker Compose
 
 ```bash
 # 1. Levantar DynamoDB Local
@@ -408,9 +442,8 @@ $env:AWS_SECRET_ACCESS_KEY = "local"
 
 ### Opción B — DynamoDB en AWS
 
-1. Inicia sesión: `aws login --region us-east-2 --profile <tu-perfil>`.
-2. Crea la tabla `franchises` con `PK` (String, partition key) y `SK` (String, sort key), con el mismo comando de arriba sin `--endpoint-url`.
-3. Arranca la API:
+1. Crea la tabla con Terraform (ver [Infraestructura como código](#infraestructura-como-código-terraform)).
+2. Arranca la API con tus credenciales o con las del usuario creado por Terraform:
 
 ```bash
 AWS_PROFILE=<tu-perfil> AWS_REGION=us-east-2 ./mvnw spring-boot:run
@@ -424,6 +457,53 @@ java -jar target/demo-0.0.1-SNAPSHOT.jar
 ```
 
 La API queda disponible en `http://localhost:8080`.
+
+---
+
+## Infraestructura como código (Terraform)
+
+La carpeta [`infra/`](infra) crea en AWS todo lo que la API necesita:
+
+| Recurso | Detalle |
+|---|---|
+| `aws_dynamodb_table.franchises` | Tabla única con `PK` (hash) y `SK` (range), cifrada, modo provisionado 5/5 (dentro del nivel gratuito) |
+| `aws_iam_user.app` | Usuario exclusivo de la aplicación |
+| `aws_iam_user_policy.app_table_access` | **Mínimo privilegio:** solo `GetItem`, `PutItem`, `UpdateItem`, `DeleteItem` y `Query` sobre esa tabla |
+| `aws_iam_access_key.app` | Credenciales para la API cuando corre fuera de AWS |
+
+```mermaid
+flowchart LR
+    TF["Terraform<br/>infra/"] --> T[("DynamoDB<br/>franchises")]
+    TF --> U["IAM user<br/>franchise-api-app"]
+    U -- "política: solo esta tabla" --> T
+    API["Franchise API<br/>(contenedor)"] -- "AWS_ACCESS_KEY_ID<br/>AWS_SECRET_ACCESS_KEY" --> U
+```
+
+### Aplicar
+
+Requiere [Terraform](https://developer.hashicorp.com/terraform/install) ≥ 1.6 y credenciales de AWS.
+
+```bash
+cd infra
+terraform init
+terraform plan
+terraform apply
+```
+
+Variables principales (`variables.tf`): `aws_region` (por defecto `us-east-2`), `table_name` (`franchises`), `read_capacity` / `write_capacity` (`5`), `create_app_user` (`true`).
+
+### Obtener las credenciales de la aplicación
+
+```bash
+terraform output app_access_key_id
+terraform output -raw app_secret_access_key
+```
+
+Se configuran como variables de entorno del contenedor (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) junto con `AWS_REGION` y `DYNAMODB_TABLE`.
+
+> **Seguridad:** el archivo de estado (`terraform.tfstate`) contiene la clave secreta, por eso está en `.gitignore` y nunca se sube al repositorio.
+
+Para eliminar todo: `terraform destroy`.
 
 ---
 
@@ -456,6 +536,8 @@ Cobertura por endpoint:
 | Renombrar sucursal | 8 |
 | Renombrar producto | 8 |
 
+**Resultado:** `Tests run: 90, Failures: 0, Errors: 0, Skipped: 0` — **BUILD SUCCESS**. El total incluye las ejecuciones de las pruebas parametrizadas y la prueba de arranque del contexto de Spring (`DemoApplicationTests`).
+
 ---
 
 ## Documentación OpenAPI
@@ -485,6 +567,8 @@ gitGraph
     commit id: "feat: renombrar x3"
     commit id: "test: más pruebas"
     commit id: "docs: OpenAPI y README"
+    commit id: "feat: Docker"
+    commit id: "feat: Terraform"
 ```
 
 ---
@@ -495,11 +579,11 @@ gitGraph
 |---|---|
 | Proyecto en Spring Boot | ✅ |
 | Endpoints 1 a 6 (crear franquicia, sucursal, producto, eliminar, stock, mayor stock) | ✅ |
-| Persistencia en la nube (DynamoDB) | ✅ Código listo · la tabla en AWS se crea con Terraform (pendiente) |
+| Persistencia en la nube (DynamoDB) | ✅ Amazon DynamoDB (`us-east-2`), creada con Terraform |
 | Programación reactiva | ✅ WebFlux + Reactor + cliente asíncrono de DynamoDB |
 | Endpoints para cambiar nombres (franquicia, sucursal, producto) | ✅ |
 | Pruebas unitarias | ✅ |
 | Documentación (README + OpenAPI) | ✅ |
-| Empaquetado con Docker | ⏳ Pendiente |
-| Infraestructura como código (Terraform) | ⏳ Pendiente |
+| Empaquetado con Docker | ✅ `Dockerfile` multi-etapa + `docker-compose.yml` |
+| Infraestructura como código (Terraform) | ✅ `infra/` |
 | Despliegue en la nube | ⏳ Pendiente |
