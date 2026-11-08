@@ -17,6 +17,7 @@
 	<properties>
 		<java.version>21</java.version>
 		<aws.sdk.version>2.57.11</aws.sdk.version>
+		<springdoc.version>3.2.0</springdoc.version>
 	</properties>
 
 	<dependencyManagement>
@@ -36,6 +37,13 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+
+		<!-- Swagger UI: muestra la especificacion static/openapi.yaml -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+			<version>${springdoc.version}</version>
 		</dependency>
 
 		<!-- DynamoDB: cliente asincrono + Enhanced Client -->
