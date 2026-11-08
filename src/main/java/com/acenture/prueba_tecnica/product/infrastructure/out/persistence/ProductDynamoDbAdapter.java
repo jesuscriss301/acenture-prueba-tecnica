@@ -4,7 +4,9 @@ import com.acenture.prueba_tecnica.product.application.port.out.ProductRepositor
 import com.acenture.prueba_tecnica.product.domain.model.Product;
 import com.acenture.prueba_tecnica.shared.infrastructure.persistence.CatalogItem;
 import com.acenture.prueba_tecnica.shared.infrastructure.persistence.DynamoDbKeys;
+import com.acenture.prueba_tecnica.shared.infrastructure.persistence.DynamoDbQueries;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
@@ -50,6 +52,13 @@ public class ProductDynamoDbAdapter implements ProductRepositoryPort {
     @Override
     public Mono<Product> deleteById(String franchiseId, String branchId, String productId) {
         return Mono.fromFuture(() -> table.deleteItem(productKey(franchiseId, branchId, productId)))
+                .map(ProductItemMapper::toDomain);
+    }
+
+    @Override
+    public Flux<Product> findByFranchiseId(String franchiseId) {
+        return DynamoDbQueries.bySortKeyPrefix(table, DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.BRANCH_PREFIX)
+                .filter(item -> DynamoDbKeys.PRODUCT_ENTITY.equals(item.getEntityType()))
                 .map(ProductItemMapper::toDomain);
     }
 

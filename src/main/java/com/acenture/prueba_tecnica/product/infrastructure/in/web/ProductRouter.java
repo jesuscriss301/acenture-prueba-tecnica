@@ -12,6 +12,7 @@ public class ProductRouter {
 
     public static final String PRODUCTS_PATH = "/api/franchises/{franchiseId}/branches/{branchId}/products";
     public static final String PRODUCT_PATH = PRODUCTS_PATH + "/{productId}";
+    public static final String TOP_STOCK_PATH = "/api/franchises/{franchiseId}/top-stock-products";
 
     @Bean
     public RouterFunction<ServerResponse> productRoutes(ProductHandler handler) {
@@ -19,5 +20,11 @@ public class ProductRouter {
                 .POST(PRODUCTS_PATH, handler::add)
                 .DELETE(PRODUCT_PATH, handler::delete)
                 .PATCH(PRODUCT_PATH + "/stock", handler::updateStock));
+    }
+
+    @Bean
+    public RouterFunction<ServerResponse> topStockProductRoutes(TopStockProductHandler handler) {
+        return ApiErrorResponses.withErrorHandling(RouterFunctions.route()
+                .GET(TOP_STOCK_PATH, handler::getByFranchise));
     }
 }

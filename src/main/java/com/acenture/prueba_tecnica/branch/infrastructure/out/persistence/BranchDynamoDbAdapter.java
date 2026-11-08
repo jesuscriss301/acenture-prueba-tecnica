@@ -4,7 +4,9 @@ import com.acenture.prueba_tecnica.branch.application.port.out.BranchRepositoryP
 import com.acenture.prueba_tecnica.branch.domain.model.Branch;
 import com.acenture.prueba_tecnica.shared.infrastructure.persistence.CatalogItem;
 import com.acenture.prueba_tecnica.shared.infrastructure.persistence.DynamoDbKeys;
+import com.acenture.prueba_tecnica.shared.infrastructure.persistence.DynamoDbQueries;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.model.PutItemEnhancedRequest;
@@ -35,5 +37,12 @@ public class BranchDynamoDbAdapter implements BranchRepositoryPort {
                         DynamoDbKeys.key(DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.branchSk(branchId))))
                 .map(item -> true)
                 .defaultIfEmpty(false);
+    }
+
+    @Override
+    public Flux<Branch> findByFranchiseId(String franchiseId) {
+        return DynamoDbQueries.bySortKeyPrefix(table, DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.BRANCH_PREFIX)
+                .filter(item -> DynamoDbKeys.BRANCH_ENTITY.equals(item.getEntityType()))
+                .map(BranchItemMapper::toDomain);
     }
 }

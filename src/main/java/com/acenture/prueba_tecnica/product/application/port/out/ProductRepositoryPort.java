@@ -1,6 +1,7 @@
 package com.acenture.prueba_tecnica.product.application.port.out;
 
 import com.acenture.prueba_tecnica.product.domain.model.Product;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -21,4 +22,6 @@ public interface ProductRepositoryPort {
      * Elimina el producto y lo devuelve. Vacío si no existía.
      */
     Mono<Product> deleteById(String franchiseId, String branchId, String productId);
+
+    Flux<Product> findByFranchiseId(String franchiseId);
 }
