@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.acenture.prueba_tecnica.branch.infrastructure.in.web.BranchRouterTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.329 s -- in com.acenture.prueba_tecnica.branch.infrastructure.in.web.BranchRouterTest
