@@ -4,6 +4,7 @@ import com.acenture.prueba_tecnica.branch.application.port.out.BranchRepositoryP
 import com.acenture.prueba_tecnica.product.application.port.in.AddProductUseCase.AddProductCommand;
 import com.acenture.prueba_tecnica.product.application.port.out.ProductRepositoryPort;
 import com.acenture.prueba_tecnica.product.domain.model.Product;
+import com.acenture.prueba_tecnica.shared.domain.exception.DomainValidationException;
 import com.acenture.prueba_tecnica.shared.domain.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import reactor.test.StepVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,6 +56,33 @@ class AddProductServiceTest {
 
         StepVerifier.create(service.add(new AddProductCommand("f-1", "b-x", "Café", 5)))
                 .expectError(ResourceNotFoundException.class)
+                .verify();
+
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectNegativeStockWithoutQuerying() {
+        StepVerifier.create(service.add(new AddProductCommand("f-1", "b-1", "Café", -5)))
+                .expectError(DomainValidationException.class)
+                .verify();
+
+        verify(branchRepository, never()).existsById(anyString(), anyString());
+    }
+
+    @Test
+    void shouldRejectMissingStockWithoutQuerying() {
+        StepVerifier.create(service.add(new AddProductCommand("f-1", "b-1", "Café", null)))
+                .expectErrorMessage("El stock es obligatorio")
+                .verify();
+
+        verify(branchRepository, never()).existsById(anyString(), anyString());
+    }
+
+    @Test
+    void shouldRejectBlankNameWithoutQuerying() {
+        StepVerifier.create(service.add(new AddProductCommand("f-1", "b-1", " ", 3)))
+                .expectError(DomainValidationException.class)
                 .verify();
 
         verify(productRepository, never()).save(any());

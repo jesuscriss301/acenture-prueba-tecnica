@@ -1,5 +1,6 @@
 package com.acenture.prueba_tecnica.franchise.infrastructure.in.web;
 
+import com.acenture.prueba_tecnica.franchise.application.port.in.CreateFranchiseUseCase.CreateFranchiseCommand;
 import com.acenture.prueba_tecnica.franchise.application.port.in.CreateFranchiseUseCase;
 import com.acenture.prueba_tecnica.franchise.application.port.in.RenameFranchiseUseCase;
 import com.acenture.prueba_tecnica.franchise.domain.model.Franchise;
@@ -13,6 +14,7 @@ import reactor.core.publisher.Mono;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class FranchiseRouterTest {
@@ -95,5 +97,41 @@ class FranchiseRouterTest {
                 .bodyValue("{\"name\":\"Franquicia Sur\"}")
                 .exchange()
                 .expectStatus().isNotFound();
+    }
+
+    @Test
+    void postShouldReturn400WhenBodyIsEmpty() {
+        client.post().uri(FranchiseRouter.BASE_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.message").isEqualTo("El cuerpo de la petición es obligatorio");
+    }
+
+    @Test
+    void postShouldSendNameToUseCase() {
+        when(createFranchiseUseCase.create(any()))
+                .thenReturn(Mono.just(new Franchise("abc-123", "Franquicia Norte")));
+
+        client.post().uri(FranchiseRouter.BASE_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"Franquicia Norte\"}")
+                .exchange()
+                .expectStatus().isCreated();
+
+        verify(createFranchiseUseCase).create(new CreateFranchiseCommand("Franquicia Norte"));
+    }
+
+    @Test
+    void patchNameShouldReturn400WhenNameIsBlank() {
+        when(renameFranchiseUseCase.rename(any()))
+                .thenReturn(Mono.error(new DomainValidationException("El nombre de la franquicia es obligatorio")));
+
+        client.patch().uri(FranchiseRouter.BASE_PATH + "/abc-123/name")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
     }
 }

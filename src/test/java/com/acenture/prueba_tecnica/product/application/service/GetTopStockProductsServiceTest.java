@@ -87,4 +87,31 @@ class GetTopStockProductsServiceTest {
                 .expectError(ResourceNotFoundException.class)
                 .verify();
     }
+
+    @Test
+    void shouldIgnoreProductsOfUnknownBranches() {
+        when(franchiseRepository.existsById(FRANCHISE)).thenReturn(Mono.just(true));
+        when(branchRepository.findByFranchiseId(FRANCHISE))
+                .thenReturn(Flux.just(new Branch("b-1", FRANCHISE, "Sucursal Centro")));
+        when(productRepository.findByFranchiseId(FRANCHISE)).thenReturn(Flux.just(
+                new Product("p-1", FRANCHISE, "b-1", "Café", 3),
+                new Product("p-2", FRANCHISE, "b-borrada", "Té", 99)));
+
+        StepVerifier.create(service.getByFranchise(FRANCHISE))
+                .expectNext(new BranchTopStockProduct("b-1", "Sucursal Centro", "p-1", "Café", 3))
+                .verifyComplete();
+    }
+
+    @Test
+    void shouldIncludeProductWithZeroStock() {
+        when(franchiseRepository.existsById(FRANCHISE)).thenReturn(Mono.just(true));
+        when(branchRepository.findByFranchiseId(FRANCHISE))
+                .thenReturn(Flux.just(new Branch("b-1", FRANCHISE, "Sucursal Centro")));
+        when(productRepository.findByFranchiseId(FRANCHISE))
+                .thenReturn(Flux.just(new Product("p-1", FRANCHISE, "b-1", "Café", 0)));
+
+        StepVerifier.create(service.getByFranchise(FRANCHISE))
+                .expectNext(new BranchTopStockProduct("b-1", "Sucursal Centro", "p-1", "Café", 0))
+                .verifyComplete();
+    }
 }

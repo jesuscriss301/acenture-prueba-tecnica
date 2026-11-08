@@ -47,4 +47,43 @@ class TopStockProductRouterTest {
                 .exchange()
                 .expectStatus().isNotFound();
     }
+
+    @Test
+    void getShouldReturnEmptyArrayWhenThereAreNoProducts() {
+        when(useCase.getByFranchise("f-1")).thenReturn(Flux.empty());
+
+        client.get().uri("/api/franchises/f-1/top-stock-products")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .json("[]");
+    }
+
+    @Test
+    void getShouldKeepOrderReturnedByUseCase() {
+        when(useCase.getByFranchise("f-1")).thenReturn(Flux.just(
+                new BranchTopStockProduct("b-1", "Sucursal Centro", "p-2", "Té", 30),
+                new BranchTopStockProduct("b-2", "Sucursal Norte", "p-3", "Pan", 7)));
+
+        client.get().uri("/api/franchises/f-1/top-stock-products")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(2)
+                .jsonPath("$[0].branchId").isEqualTo("b-1")
+                .jsonPath("$[1].branchId").isEqualTo("b-2")
+                .jsonPath("$[1].productId").isEqualTo("p-3");
+    }
+
+    @Test
+    void getShouldReturnErrorBodyWhenFranchiseDoesNotExist() {
+        when(useCase.getByFranchise("f-x"))
+                .thenReturn(Flux.error(new ResourceNotFoundException("La franquicia f-x no existe")));
+
+        client.get().uri("/api/franchises/f-x/top-stock-products")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.message").isEqualTo("La franquicia f-x no existe");
+    }
 }

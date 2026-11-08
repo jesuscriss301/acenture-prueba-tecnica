@@ -3,6 +3,7 @@ package com.acenture.prueba_tecnica.product.application.service;
 import com.acenture.prueba_tecnica.product.application.port.in.RenameProductUseCase.RenameProductCommand;
 import com.acenture.prueba_tecnica.product.application.port.out.ProductRepositoryPort;
 import com.acenture.prueba_tecnica.product.domain.model.Product;
+import com.acenture.prueba_tecnica.shared.domain.exception.DomainValidationException;
 import com.acenture.prueba_tecnica.shared.domain.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,8 @@ import reactor.test.StepVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +53,40 @@ class RenameProductServiceTest {
 
         StepVerifier.create(service.rename(new RenameProductCommand("f-1", "b-1", "p-x", "Nuevo")))
                 .expectError(ResourceNotFoundException.class)
+                .verify();
+    }
+
+    @Test
+    void shouldRejectBlankNameAndNotUpdate() {
+        when(productRepository.findById("f-1", "b-1", "p-1"))
+                .thenReturn(Mono.just(new Product("p-1", "f-1", "b-1", "Café", 8)));
+
+        StepVerifier.create(service.rename(new RenameProductCommand("f-1", "b-1", "p-1", " ")))
+                .expectError(DomainValidationException.class)
+                .verify();
+
+        verify(productRepository, never()).update(any());
+    }
+
+    @Test
+    void shouldRejectNameLongerThanMax() {
+        when(productRepository.findById("f-1", "b-1", "p-1"))
+                .thenReturn(Mono.just(new Product("p-1", "f-1", "b-1", "Café", 8)));
+
+        StepVerifier.create(service.rename(new RenameProductCommand("f-1", "b-1", "p-1", "x".repeat(101))))
+                .expectError(DomainValidationException.class)
+                .verify();
+    }
+
+    @Test
+    void shouldPropagateRepositoryError() {
+        when(productRepository.findById("f-1", "b-1", "p-1"))
+                .thenReturn(Mono.just(new Product("p-1", "f-1", "b-1", "Café", 8)));
+        when(productRepository.update(any(Product.class)))
+                .thenReturn(Mono.error(new IllegalStateException("DynamoDB no disponible")));
+
+        StepVerifier.create(service.rename(new RenameProductCommand("f-1", "b-1", "p-1", "Nuevo")))
+                .expectErrorMessage("DynamoDB no disponible")
                 .verify();
     }
 }

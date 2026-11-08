@@ -65,4 +65,26 @@ class RenameFranchiseServiceTest {
 
         verify(franchiseRepository, never()).update(any());
     }
+
+    @Test
+    void shouldTrimNewName() {
+        when(franchiseRepository.findById("f-1")).thenReturn(Mono.just(new Franchise("f-1", "Vieja")));
+        when(franchiseRepository.update(any(Franchise.class)))
+                .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+
+        StepVerifier.create(service.rename(new RenameFranchiseCommand("f-1", "  Nueva  ")))
+                .assertNext(franchise -> assertThat(franchise.name()).isEqualTo("Nueva"))
+                .verifyComplete();
+    }
+
+    @Test
+    void shouldPropagateRepositoryError() {
+        when(franchiseRepository.findById("f-1")).thenReturn(Mono.just(new Franchise("f-1", "Vieja")));
+        when(franchiseRepository.update(any(Franchise.class)))
+                .thenReturn(Mono.error(new IllegalStateException("DynamoDB no disponible")));
+
+        StepVerifier.create(service.rename(new RenameFranchiseCommand("f-1", "Nueva")))
+                .expectErrorMessage("DynamoDB no disponible")
+                .verify();
+    }
 }

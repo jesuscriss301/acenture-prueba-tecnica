@@ -64,4 +64,37 @@ class UpdateProductStockServiceTest {
 
         verify(productRepository, never()).findById(anyString(), anyString(), anyString());
     }
+
+    @Test
+    void shouldRejectMissingStock() {
+        StepVerifier.create(service.updateStock(new UpdateProductStockCommand("f-1", "b-1", "p-1", null)))
+                .expectErrorMessage("El stock es obligatorio")
+                .verify();
+
+        verify(productRepository, never()).findById(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void shouldAllowZeroStock() {
+        when(productRepository.findById("f-1", "b-1", "p-1"))
+                .thenReturn(Mono.just(new Product("p-1", "f-1", "b-1", "Café", 5)));
+        when(productRepository.update(any(Product.class)))
+                .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+
+        StepVerifier.create(service.updateStock(new UpdateProductStockCommand("f-1", "b-1", "p-1", 0)))
+                .assertNext(product -> assertThat(product.stock()).isZero())
+                .verifyComplete();
+    }
+
+    @Test
+    void shouldKeepNameWhenUpdatingStock() {
+        when(productRepository.findById("f-1", "b-1", "p-1"))
+                .thenReturn(Mono.just(new Product("p-1", "f-1", "b-1", "Café", 5)));
+        when(productRepository.update(any(Product.class)))
+                .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+
+        StepVerifier.create(service.updateStock(new UpdateProductStockCommand("f-1", "b-1", "p-1", 9)))
+                .assertNext(product -> assertThat(product.name()).isEqualTo("Café"))
+                .verifyComplete();
+    }
 }

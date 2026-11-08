@@ -1,8 +1,10 @@
 package com.acenture.prueba_tecnica.product.infrastructure.in.web;
 
 import com.acenture.prueba_tecnica.product.application.port.in.AddProductUseCase;
+import com.acenture.prueba_tecnica.product.application.port.in.DeleteProductUseCase.DeleteProductCommand;
 import com.acenture.prueba_tecnica.product.application.port.in.DeleteProductUseCase;
 import com.acenture.prueba_tecnica.product.application.port.in.RenameProductUseCase;
+import com.acenture.prueba_tecnica.product.application.port.in.UpdateProductStockUseCase.UpdateProductStockCommand;
 import com.acenture.prueba_tecnica.product.application.port.in.UpdateProductStockUseCase;
 import com.acenture.prueba_tecnica.product.domain.model.Product;
 import com.acenture.prueba_tecnica.shared.domain.exception.DomainValidationException;
@@ -15,6 +17,7 @@ import reactor.core.publisher.Mono;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ProductRouterTest {
@@ -113,5 +116,115 @@ class ProductRouterTest {
                 .expectBody()
                 .jsonPath("$.name").isEqualTo("Café Especial")
                 .jsonPath("$.stock").isEqualTo(5);
+    }
+
+    @Test
+    void postShouldReturn404WhenBranchDoesNotExist() {
+        when(addProductUseCase.add(any()))
+                .thenReturn(Mono.error(new ResourceNotFoundException("La sucursal b-1 no existe en la franquicia f-1")));
+
+        client.post().uri(PRODUCTS_URI)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"Café\",\"stock\":5}")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void postShouldReturn400WhenStockIsNotANumber() {
+        client.post().uri(PRODUCTS_URI)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"Café\",\"stock\":\"muchos\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
+    void deleteShouldSendPathVariablesToUseCase() {
+        when(deleteProductUseCase.delete(any())).thenReturn(Mono.empty());
+
+        client.delete().uri(PRODUCTS_URI + "/p-9")
+                .exchange()
+                .expectStatus().isNoContent();
+
+        verify(deleteProductUseCase).delete(new DeleteProductCommand("f-1", "b-1", "p-9"));
+    }
+
+    @Test
+    void deleteShouldReturnErrorBodyWhenProductDoesNotExist() {
+        when(deleteProductUseCase.delete(any()))
+                .thenReturn(Mono.error(new ResourceNotFoundException("El producto p-x no existe en la sucursal b-1")));
+
+        client.delete().uri(PRODUCTS_URI + "/p-x")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.message").isEqualTo("El producto p-x no existe en la sucursal b-1");
+    }
+
+    @Test
+    void patchStockShouldReturn404WhenProductDoesNotExist() {
+        when(updateProductStockUseCase.updateStock(any()))
+                .thenReturn(Mono.error(new ResourceNotFoundException("El producto p-x no existe en la sucursal b-1")));
+
+        client.patch().uri(PRODUCTS_URI + "/p-x/stock")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"stock\":10}")
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    void patchStockShouldReturn400WhenStockIsNegative() {
+        when(updateProductStockUseCase.updateStock(any()))
+                .thenReturn(Mono.error(new DomainValidationException("El stock no puede ser negativo")));
+
+        client.patch().uri(PRODUCTS_URI + "/p-1/stock")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"stock\":-1}")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.message").isEqualTo("El stock no puede ser negativo");
+    }
+
+    @Test
+    void patchStockShouldSendValuesToUseCase() {
+        when(updateProductStockUseCase.updateStock(any()))
+                .thenReturn(Mono.just(new Product("p-1", "f-1", "b-1", "Café", 15)));
+
+        client.patch().uri(PRODUCTS_URI + "/p-1/stock")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"stock\":15}")
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(updateProductStockUseCase).updateStock(new UpdateProductStockCommand("f-1", "b-1", "p-1", 15));
+    }
+
+    @Test
+    void patchNameShouldReturn404WhenProductDoesNotExist() {
+        when(renameProductUseCase.rename(any()))
+                .thenReturn(Mono.error(new ResourceNotFoundException("El producto p-x no existe en la sucursal b-1")));
+
+        client.patch().uri(PRODUCTS_URI + "/p-x/name")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"Nuevo\"}")
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    void patchNameShouldReturn400WhenNameIsBlank() {
+        when(renameProductUseCase.rename(any()))
+                .thenReturn(Mono.error(new DomainValidationException("El nombre del producto es obligatorio")));
+
+        client.patch().uri(PRODUCTS_URI + "/p-1/name")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
     }
 }

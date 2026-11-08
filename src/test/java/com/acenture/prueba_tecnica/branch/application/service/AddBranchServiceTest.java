@@ -70,4 +70,24 @@ class AddBranchServiceTest {
 
         verify(franchiseRepository, never()).existsById(anyString());
     }
+
+    @Test
+    void shouldPropagateRepositoryError() {
+        when(franchiseRepository.existsById("f-1")).thenReturn(Mono.just(true));
+        when(branchRepository.save(any(Branch.class)))
+                .thenReturn(Mono.error(new IllegalStateException("DynamoDB no disponible")));
+
+        StepVerifier.create(service.add(new AddBranchCommand("f-1", "Sucursal Centro")))
+                .expectErrorMessage("DynamoDB no disponible")
+                .verify();
+    }
+
+    @Test
+    void shouldRejectNameLongerThanMax() {
+        StepVerifier.create(service.add(new AddBranchCommand("f-1", "a".repeat(101))))
+                .expectError(DomainValidationException.class)
+                .verify();
+
+        verify(branchRepository, never()).save(any());
+    }
 }
