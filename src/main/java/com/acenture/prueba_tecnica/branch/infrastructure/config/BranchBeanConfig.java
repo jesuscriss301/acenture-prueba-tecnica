@@ -1,8 +1,10 @@
 package com.acenture.prueba_tecnica.branch.infrastructure.config;
 
 import com.acenture.prueba_tecnica.branch.application.port.in.AddBranchUseCase;
+import com.acenture.prueba_tecnica.branch.application.port.in.RenameBranchUseCase;
 import com.acenture.prueba_tecnica.branch.application.port.out.BranchRepositoryPort;
 import com.acenture.prueba_tecnica.branch.application.service.AddBranchService;
+import com.acenture.prueba_tecnica.branch.application.service.RenameBranchService;
 import com.acenture.prueba_tecnica.franchise.application.port.out.FranchiseRepositoryPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,5 +16,10 @@ public class BranchBeanConfig {
     public AddBranchUseCase addBranchUseCase(FranchiseRepositoryPort franchiseRepository,
                                              BranchRepositoryPort branchRepository) {
         return new AddBranchService(franchiseRepository, branchRepository);
+    }
+
+    @Bean
+    public RenameBranchUseCase renameBranchUseCase(BranchRepositoryPort branchRepository) {
+        return new RenameBranchService(branchRepository);
     }
 }

@@ -18,4 +18,8 @@ public record Branch(String id, String franchiseId, String name) {
     public static Branch create(String franchiseId, String name) {
         return new Branch(UUID.randomUUID().toString(), franchiseId, name);
     }
+
+    public Branch rename(String newName) {
+        return new Branch(id, franchiseId, newName);
+    }
 }

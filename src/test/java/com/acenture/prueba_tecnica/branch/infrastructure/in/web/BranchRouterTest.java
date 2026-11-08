@@ -1,6 +1,7 @@
 package com.acenture.prueba_tecnica.branch.infrastructure.in.web;
 
 import com.acenture.prueba_tecnica.branch.application.port.in.AddBranchUseCase;
+import com.acenture.prueba_tecnica.branch.application.port.in.RenameBranchUseCase;
 import com.acenture.prueba_tecnica.branch.domain.model.Branch;
 import com.acenture.prueba_tecnica.shared.domain.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,12 +17,14 @@ import static org.mockito.Mockito.when;
 class BranchRouterTest {
 
     private AddBranchUseCase addBranchUseCase;
+    private RenameBranchUseCase renameBranchUseCase;
     private WebTestClient client;
 
     @BeforeEach
     void setUp() {
         addBranchUseCase = mock(AddBranchUseCase.class);
-        BranchHandler handler = new BranchHandler(addBranchUseCase);
+        renameBranchUseCase = mock(RenameBranchUseCase.class);
+        BranchHandler handler = new BranchHandler(addBranchUseCase, renameBranchUseCase);
         client = WebTestClient.bindToRouterFunction(new BranchRouter().branchRoutes(handler)).build();
     }
 
@@ -53,5 +56,19 @@ class BranchRouterTest {
                 .expectStatus().isNotFound()
                 .expectBody()
                 .jsonPath("$.code").isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void patchNameShouldReturn200() {
+        when(renameBranchUseCase.rename(any()))
+                .thenReturn(Mono.just(new Branch("b-1", "f-1", "Sucursal Sur")));
+
+        client.patch().uri("/api/franchises/f-1/branches/b-1/name")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"Sucursal Sur\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.name").isEqualTo("Sucursal Sur");
     }
 }

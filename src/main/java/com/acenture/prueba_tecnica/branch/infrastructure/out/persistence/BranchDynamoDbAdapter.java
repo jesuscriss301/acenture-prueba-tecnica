@@ -33,10 +33,25 @@ public class BranchDynamoDbAdapter implements BranchRepositoryPort {
 
     @Override
     public Mono<Boolean> existsById(String franchiseId, String branchId) {
-        return Mono.fromFuture(() -> table.getItem(
-                        DynamoDbKeys.key(DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.branchSk(branchId))))
+        return findItem(franchiseId, branchId)
                 .map(item -> true)
                 .defaultIfEmpty(false);
+    }
+
+    @Override
+    public Mono<Branch> findById(String franchiseId, String branchId) {
+        return findItem(franchiseId, branchId).map(BranchItemMapper::toDomain);
+    }
+
+    @Override
+    public Mono<Branch> update(Branch branch) {
+        PutItemEnhancedRequest<CatalogItem> request = PutItemEnhancedRequest.builder(CatalogItem.class)
+                .item(BranchItemMapper.toItem(branch))
+                .conditionExpression(DynamoDbKeys.ITEM_MUST_EXIST)
+                .build();
+
+        return Mono.fromFuture(() -> table.putItem(request))
+                .thenReturn(branch);
     }
 
     @Override
@@ -44,5 +59,10 @@ public class BranchDynamoDbAdapter implements BranchRepositoryPort {
         return DynamoDbQueries.bySortKeyPrefix(table, DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.BRANCH_PREFIX)
                 .filter(item -> DynamoDbKeys.BRANCH_ENTITY.equals(item.getEntityType()))
                 .map(BranchItemMapper::toDomain);
+    }
+
+    private Mono<CatalogItem> findItem(String franchiseId, String branchId) {
+        return Mono.fromFuture(() -> table.getItem(
+                DynamoDbKeys.key(DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.branchSk(branchId))));
     }
 }

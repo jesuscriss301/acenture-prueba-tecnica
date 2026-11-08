@@ -15,6 +15,7 @@ public class BranchRouter {
     @Bean
     public RouterFunction<ServerResponse> branchRoutes(BranchHandler handler) {
         return ApiErrorResponses.withErrorHandling(RouterFunctions.route()
-                .POST(BRANCHES_PATH, handler::add));
+                .POST(BRANCHES_PATH, handler::add)
+                .PATCH(BRANCHES_PATH + "/{branchId}/name", handler::rename));
     }
 }

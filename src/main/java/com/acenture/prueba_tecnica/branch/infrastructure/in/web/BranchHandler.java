@@ -2,9 +2,12 @@ package com.acenture.prueba_tecnica.branch.infrastructure.in.web;
 
 import com.acenture.prueba_tecnica.branch.application.port.in.AddBranchUseCase;
 import com.acenture.prueba_tecnica.branch.application.port.in.AddBranchUseCase.AddBranchCommand;
+import com.acenture.prueba_tecnica.branch.application.port.in.RenameBranchUseCase;
+import com.acenture.prueba_tecnica.branch.application.port.in.RenameBranchUseCase.RenameBranchCommand;
 import com.acenture.prueba_tecnica.branch.infrastructure.in.web.dto.AddBranchRequest;
 import com.acenture.prueba_tecnica.branch.infrastructure.in.web.dto.BranchResponse;
 import com.acenture.prueba_tecnica.shared.domain.exception.DomainValidationException;
+import com.acenture.prueba_tecnica.shared.infrastructure.web.dto.RenameRequest;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -17,9 +20,11 @@ import java.net.URI;
 public class BranchHandler {
 
     private final AddBranchUseCase addBranchUseCase;
+    private final RenameBranchUseCase renameBranchUseCase;
 
-    public BranchHandler(AddBranchUseCase addBranchUseCase) {
+    public BranchHandler(AddBranchUseCase addBranchUseCase, RenameBranchUseCase renameBranchUseCase) {
         this.addBranchUseCase = addBranchUseCase;
+        this.renameBranchUseCase = renameBranchUseCase;
     }
 
     public Mono<ServerResponse> add(ServerRequest request) {
@@ -30,6 +35,18 @@ public class BranchHandler {
                 .flatMap(addBranchUseCase::add)
                 .flatMap(branch -> ServerResponse
                         .created(URI.create(request.path() + "/" + branch.id()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(BranchResponse.from(branch)));
+    }
+
+    public Mono<ServerResponse> rename(ServerRequest request) {
+        String franchiseId = request.pathVariable("franchiseId");
+        String branchId = request.pathVariable("branchId");
+        return request.bodyToMono(RenameRequest.class)
+                .switchIfEmpty(Mono.error(new DomainValidationException("El cuerpo de la petición es obligatorio")))
+                .map(body -> new RenameBranchCommand(franchiseId, branchId, body.name()))
+                .flatMap(renameBranchUseCase::rename)
+                .flatMap(branch -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(BranchResponse.from(branch)));
     }
