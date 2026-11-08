@@ -4,10 +4,31 @@ API REST **reactiva** para administrar franquicias, sus sucursales y los product
 
 > Prueba técnica — Desarrollador Backend.
 
+## Demo en vivo
+
+La API está desplegada en AWS (EC2 + DynamoDB, región `us-east-2`):
+
+| | URL |
+|---|---|
+| **Swagger UI** | http://18.117.177.251:8080/swagger-ui.html |
+| Contrato OpenAPI | http://18.117.177.251:8080/openapi.yaml |
+| API base | http://18.117.177.251:8080/api/franchises |
+
+Prueba rápida:
+
+```bash
+# Crear una franquicia
+curl -X POST http://18.117.177.251:8080/api/franchises \
+  -H "Content-Type: application/json" -d '{"name":"Mi franquicia"}'
+```
+
+> El servidor es temporal y se elimina (`terraform destroy`) al terminar el proceso de evaluación. Para levantar una copia propia, ver [Arquitectura en AWS](#arquitectura-en-aws) o ejecutar en local con `docker compose up --build`.
+
 ---
 
 ## Tabla de contenido
 
+0. [Demo en vivo](#demo-en-vivo)
 1. [Tecnologías](#tecnologías)
 2. [Arquitectura](#arquitectura)
 3. [Estructura del proyecto](#estructura-del-proyecto)
