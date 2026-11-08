@@ -1,4 +1,4 @@
-package com.acenture.prueba_tecnica.franchise.infrastructure.out.persistence;
+package com.acenture.prueba_tecnica.shared.infrastructure.persistence;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
@@ -6,18 +6,22 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbParti
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 /**
- * Representación de la franquicia en DynamoDB. Solo existe en infraestructura.
+ * Ítem genérico de la tabla única. Franquicias, sucursales y productos comparten
+ * la misma tabla; el atributo entityType indica qué representa cada ítem.
  */
 @DynamoDbBean
-public class FranchiseItem {
+public class CatalogItem {
 
     private String pk;
     private String sk;
     private String entityType;
     private String franchiseId;
+    private String branchId;
+    private String productId;
     private String name;
+    private Integer stock;
 
-    public FranchiseItem() {
+    public CatalogItem() {
     }
 
     @DynamoDbPartitionKey
@@ -56,11 +60,35 @@ public class FranchiseItem {
         this.franchiseId = franchiseId;
     }
 
+    public String getBranchId() {
+        return branchId;
+    }
+
+    public void setBranchId(String branchId) {
+        this.branchId = branchId;
+    }
+
+    public String getProductId() {
+        return productId;
+    }
+
+    public void setProductId(String productId) {
+        this.productId = productId;
+    }
+
     public String getName() {
         return name;
     }
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public Integer getStock() {
+        return stock;
+    }
+
+    public void setStock(Integer stock) {
+        this.stock = stock;
     }
 }

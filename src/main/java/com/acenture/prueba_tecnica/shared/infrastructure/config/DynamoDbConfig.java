@@ -1,9 +1,12 @@
 package com.acenture.prueba_tecnica.shared.infrastructure.config;
 
+import com.acenture.prueba_tecnica.shared.infrastructure.persistence.CatalogItem;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClientBuilder;
@@ -29,5 +32,11 @@ public class DynamoDbConfig {
         return DynamoDbEnhancedAsyncClient.builder()
                 .dynamoDbClient(client)
                 .build();
+    }
+
+    @Bean
+    public DynamoDbAsyncTable<CatalogItem> catalogTable(DynamoDbEnhancedAsyncClient enhancedClient,
+                                                        DynamoDbProperties properties) {
+        return enhancedClient.table(properties.tableName(), TableSchema.fromBean(CatalogItem.class));
     }
 }

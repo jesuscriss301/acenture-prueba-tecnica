@@ -1,6 +1,7 @@
 package com.acenture.prueba_tecnica.franchise.infrastructure.out.persistence;
 
 import com.acenture.prueba_tecnica.franchise.domain.model.Franchise;
+import com.acenture.prueba_tecnica.shared.infrastructure.persistence.CatalogItem;
 import com.acenture.prueba_tecnica.shared.infrastructure.persistence.DynamoDbKeys;
 
 final class FranchiseItemMapper {
@@ -8,8 +9,8 @@ final class FranchiseItemMapper {
     private FranchiseItemMapper() {
     }
 
-    static FranchiseItem toItem(Franchise franchise) {
-        FranchiseItem item = new FranchiseItem();
+    static CatalogItem toItem(Franchise franchise) {
+        CatalogItem item = new CatalogItem();
         item.setPk(DynamoDbKeys.franchisePk(franchise.id()));
         item.setSk(DynamoDbKeys.METADATA);
         item.setEntityType(DynamoDbKeys.FRANCHISE_ENTITY);
@@ -18,7 +19,7 @@ final class FranchiseItemMapper {
         return item;
     }
 
-    static Franchise toDomain(FranchiseItem item) {
+    static Franchise toDomain(CatalogItem item) {
         return new Franchise(item.getFranchiseId(), item.getName());
     }
 }
