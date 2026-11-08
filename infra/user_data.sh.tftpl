@@ -1,0 +1,25 @@
+#!/bin/bash
+# Arranque de la instancia: instala Docker, construye la imagen y levanta la API.
+# Log completo en /var/log/cloud-init-output.log
+set -euxo pipefail
+
+# Memoria de intercambio: la compilación con Maven necesita más de 1 GB
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+dnf install -y docker git
+systemctl enable --now docker
+
+git clone --depth 1 --branch ${repo_branch} ${repo_url} /opt/franchise-api
+docker build -t franchise-api /opt/franchise-api
+
+docker run -d \
+  --name franchise-api \
+  --restart unless-stopped \
+  -p ${api_port}:8080 \
+  -e AWS_REGION=${aws_region} \
+  -e DYNAMODB_TABLE=${table_name} \
+  franchise-api

@@ -29,7 +29,37 @@ variable "write_capacity" {
 }
 
 variable "create_app_user" {
-  description = "Crea un usuario IAM con permisos mínimos sobre la tabla para que la API corra fuera de AWS"
+  description = "Crea un usuario IAM con clave de acceso para correr la API fuera de AWS. No hace falta en EC2: la instancia usa un rol IAM"
   type        = bool
-  default     = true
+  default     = false
+}
+
+variable "instance_type" {
+  description = "Tipo de instancia EC2 para la API"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "repo_url" {
+  description = "Repositorio público que la instancia clona y construye"
+  type        = string
+  default     = "https://github.com/jesuscriss301/acenture-prueba-tecnica.git"
+}
+
+variable "repo_branch" {
+  description = "Rama del repositorio a desplegar"
+  type        = string
+  default     = "main"
+}
+
+variable "api_port" {
+  description = "Puerto público de la API"
+  type        = number
+  default     = 8080
+}
+
+variable "allowed_cidr" {
+  description = "Rango de IPs que pueden acceder a la API"
+  type        = string
+  default     = "0.0.0.0/0"
 }

@@ -23,3 +23,18 @@ output "app_secret_access_key" {
   value       = var.create_app_user ? aws_iam_access_key.app[0].secret : null
   sensitive   = true
 }
+
+output "instance_id" {
+  description = "ID de la instancia EC2 de la API"
+  value       = aws_instance.api.id
+}
+
+output "api_url" {
+  description = "URL base de la API"
+  value       = "http://${aws_instance.api.public_ip}:${var.api_port}"
+}
+
+output "swagger_url" {
+  description = "Swagger UI"
+  value       = "http://${aws_instance.api.public_ip}:${var.api_port}/swagger-ui.html"
+}

@@ -462,22 +462,37 @@ La API queda disponible en `http://localhost:8080`.
 
 ## Infraestructura como código (Terraform)
 
-La carpeta [`infra/`](infra) crea en AWS todo lo que la API necesita:
+La carpeta [`infra/`](infra) crea **toda la solución en AWS**: la base de datos y el servidor donde corre la API.
 
-| Recurso | Detalle |
-|---|---|
-| `aws_dynamodb_table.franchises` | Tabla única con `PK` (hash) y `SK` (range), cifrada, modo provisionado 5/5 (dentro del nivel gratuito) |
-| `aws_iam_user.app` | Usuario exclusivo de la aplicación |
-| `aws_iam_user_policy.app_table_access` | **Mínimo privilegio:** solo `GetItem`, `PutItem`, `UpdateItem`, `DeleteItem` y `Query` sobre esa tabla |
-| `aws_iam_access_key.app` | Credenciales para la API cuando corre fuera de AWS |
+| Archivo | Recurso | Detalle |
+|---|---|---|
+| `main.tf` | `aws_dynamodb_table.franchises` | Tabla única con `PK` (hash) y `SK` (range), cifrada, modo provisionado 5/5 (nivel gratuito) |
+| `compute.tf` | `aws_instance.api` | EC2 `t3.micro` con Amazon Linux 2023; al arrancar instala Docker, clona el repositorio, construye la imagen y ejecuta la API |
+| `compute.tf` | `aws_iam_role.api` + `aws_iam_instance_profile.api` | Rol de la instancia con **mínimo privilegio**: solo `GetItem`, `PutItem`, `UpdateItem`, `DeleteItem` y `Query` sobre la tabla |
+| `compute.tf` | `aws_security_group.api` | Solo el puerto `8080` abierto (configurable con `allowed_cidr`); sin SSH |
+| `main.tf` | `aws_iam_user.app` (opcional) | Usuario con clave de acceso, solo si la API se ejecuta **fuera** de AWS (`create_app_user=true`) |
 
 ```mermaid
 flowchart LR
-    TF["Terraform<br/>infra/"] --> T[("DynamoDB<br/>franchises")]
-    TF --> U["IAM user<br/>franchise-api-app"]
-    U -- "política: solo esta tabla" --> T
-    API["Franchise API<br/>(contenedor)"] -- "AWS_ACCESS_KEY_ID<br/>AWS_SECRET_ACCESS_KEY" --> U
+    U(["Usuario"]) -- "HTTP :8080" --> SG
+
+    subgraph AWS["AWS · us-east-2"]
+        subgraph VPC["VPC por defecto"]
+            SG["Security Group<br/>solo :8080"] --> EC2
+            subgraph EC2["EC2 t3.micro · Amazon Linux 2023"]
+                C["Contenedor Docker<br/>Franchise API"]
+            end
+        end
+        ROLE["IAM Role<br/>solo tabla franchises"]
+        DB[("DynamoDB<br/>franchises")]
+    end
+
+    GH["GitHub<br/>repositorio público"] -- "git clone + docker build<br/>(al arrancar)" --> EC2
+    EC2 -. "instance profile" .- ROLE
+    C -- "SDK AWS async<br/>credenciales del rol" --> DB
 ```
+
+**Seguridad:** la API **no usa claves de acceso** en AWS. La instancia tiene un rol IAM y el SDK obtiene credenciales temporales automáticamente (IMDSv2 obligatorio). El disco está cifrado y no hay puerto SSH abierto; para entrar a la instancia se usa Session Manager.
 
 ### Aplicar
 
@@ -490,18 +505,28 @@ terraform plan
 terraform apply
 ```
 
-Variables principales (`variables.tf`): `aws_region` (por defecto `us-east-2`), `table_name` (`franchises`), `read_capacity` / `write_capacity` (`5`), `create_app_user` (`true`).
+Al terminar, Terraform muestra la URL de la API:
 
-### Obtener las credenciales de la aplicación
-
-```bash
-terraform output app_access_key_id
-terraform output -raw app_secret_access_key
+```text
+api_url     = "http://<ip-publica>:8080"
+swagger_url = "http://<ip-publica>:8080/swagger-ui.html"
 ```
 
-Se configuran como variables de entorno del contenedor (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) junto con `AWS_REGION` y `DYNAMODB_TABLE`.
+La instancia tarda unos minutos en estar lista después del `apply`, porque compila el proyecto y ejecuta las pruebas dentro de Docker. El progreso queda en `/var/log/cloud-init-output.log` (visible desde Session Manager).
 
-> **Seguridad:** el archivo de estado (`terraform.tfstate`) contiene la clave secreta, por eso está en `.gitignore` y nunca se sube al repositorio.
+Variables principales (`variables.tf`):
+
+| Variable | Por defecto | Descripción |
+|---|---|---|
+| `aws_region` | `us-east-2` | Región |
+| `table_name` | `franchises` | Nombre de la tabla |
+| `read_capacity` / `write_capacity` | `5` | Capacidad provisionada |
+| `instance_type` | `t3.micro` | Tamaño del servidor |
+| `repo_url` / `repo_branch` | este repositorio / `main` | Código que se despliega |
+| `allowed_cidr` | `0.0.0.0/0` | Quién puede acceder a la API |
+| `create_app_user` | `false` | Crea usuario IAM con clave para correr la API fuera de AWS |
+
+> **Seguridad:** el estado de Terraform (`terraform.tfstate`) está en `.gitignore` y nunca se sube al repositorio.
 
 Para eliminar todo: `terraform destroy`.
 
@@ -569,6 +594,7 @@ gitGraph
     commit id: "docs: OpenAPI y README"
     commit id: "feat: Docker"
     commit id: "feat: Terraform"
+    commit id: "feat: despliegue EC2"
 ```
 
 ---
@@ -586,4 +612,4 @@ gitGraph
 | Documentación (README + OpenAPI) | ✅ |
 | Empaquetado con Docker | ✅ `Dockerfile` multi-etapa + `docker-compose.yml` |
 | Infraestructura como código (Terraform) | ✅ `infra/` |
-| Despliegue en la nube | ⏳ Pendiente |
+| Despliegue en la nube | ✅ API en EC2 + DynamoDB, todo en AWS y creado con Terraform |
