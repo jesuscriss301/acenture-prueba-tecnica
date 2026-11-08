@@ -139,7 +139,8 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
-					<argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar} -Xshare:off</argLine>
+					<!-- Entre comillas: la ruta del jar puede tener espacios -->
+					<argLine>@{argLine} "-javaagent:${org.mockito:mockito-core:jar}" -Xshare:off</argLine>
 				</configuration>
 			</plugin>
 		</plugins>
