@@ -9,4 +9,9 @@ import reactor.core.publisher.Mono;
 public interface ProductRepositoryPort {
 
     Mono<Product> save(Product product);
+
+    /**
+     * Elimina el producto y lo devuelve. Vacío si no existía.
+     */
+    Mono<Product> deleteById(String franchiseId, String branchId, String productId);
 }

@@ -28,4 +28,11 @@ public class ProductDynamoDbAdapter implements ProductRepositoryPort {
         return Mono.fromFuture(() -> table.putItem(request))
                 .thenReturn(product);
     }
+
+    @Override
+    public Mono<Product> deleteById(String franchiseId, String branchId, String productId) {
+        return Mono.fromFuture(() -> table.deleteItem(DynamoDbKeys.key(
+                        DynamoDbKeys.franchisePk(franchiseId), DynamoDbKeys.productSk(branchId, productId))))
+                .map(ProductItemMapper::toDomain);
+    }
 }

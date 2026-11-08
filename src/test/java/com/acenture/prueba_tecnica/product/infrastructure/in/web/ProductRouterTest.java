@@ -1,8 +1,10 @@
 package com.acenture.prueba_tecnica.product.infrastructure.in.web;
 
 import com.acenture.prueba_tecnica.product.application.port.in.AddProductUseCase;
+import com.acenture.prueba_tecnica.product.application.port.in.DeleteProductUseCase;
 import com.acenture.prueba_tecnica.product.domain.model.Product;
 import com.acenture.prueba_tecnica.shared.domain.exception.DomainValidationException;
+import com.acenture.prueba_tecnica.shared.domain.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -18,12 +20,14 @@ class ProductRouterTest {
     private static final String PRODUCTS_URI = "/api/franchises/f-1/branches/b-1/products";
 
     private AddProductUseCase addProductUseCase;
+    private DeleteProductUseCase deleteProductUseCase;
     private WebTestClient client;
 
     @BeforeEach
     void setUp() {
         addProductUseCase = mock(AddProductUseCase.class);
-        ProductHandler handler = new ProductHandler(addProductUseCase);
+        deleteProductUseCase = mock(DeleteProductUseCase.class);
+        ProductHandler handler = new ProductHandler(addProductUseCase, deleteProductUseCase);
         client = WebTestClient.bindToRouterFunction(new ProductRouter().productRoutes(handler)).build();
     }
 
@@ -54,5 +58,24 @@ class ProductRouterTest {
                 .expectStatus().isBadRequest()
                 .expectBody()
                 .jsonPath("$.message").isEqualTo("El stock no puede ser negativo");
+    }
+
+    @Test
+    void deleteShouldReturn204() {
+        when(deleteProductUseCase.delete(any())).thenReturn(Mono.empty());
+
+        client.delete().uri(PRODUCTS_URI + "/p-1")
+                .exchange()
+                .expectStatus().isNoContent();
+    }
+
+    @Test
+    void deleteShouldReturn404WhenProductDoesNotExist() {
+        when(deleteProductUseCase.delete(any()))
+                .thenReturn(Mono.error(new ResourceNotFoundException("El producto p-x no existe en la sucursal b-1")));
+
+        client.delete().uri(PRODUCTS_URI + "/p-x")
+                .exchange()
+                .expectStatus().isNotFound();
     }
 }

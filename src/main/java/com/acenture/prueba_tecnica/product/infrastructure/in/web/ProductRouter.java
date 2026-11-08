@@ -11,10 +11,12 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 public class ProductRouter {
 
     public static final String PRODUCTS_PATH = "/api/franchises/{franchiseId}/branches/{branchId}/products";
+    public static final String PRODUCT_PATH = PRODUCTS_PATH + "/{productId}";
 
     @Bean
     public RouterFunction<ServerResponse> productRoutes(ProductHandler handler) {
         return ApiErrorResponses.withErrorHandling(RouterFunctions.route()
-                .POST(PRODUCTS_PATH, handler::add));
+                .POST(PRODUCTS_PATH, handler::add)
+                .DELETE(PRODUCT_PATH, handler::delete));
     }
 }
