@@ -703,6 +703,8 @@ Para eliminar todo: `terraform destroy`.
 
 Las pruebas son **unitarias** y no necesitan AWS ni DynamoDB (los puertos se reemplazan con mocks).
 
+**Cobertura:** al ejecutar las pruebas, JaCoCo genera el reporte en `target/site/jacoco/index.html`.
+
 | Capa | Herramientas | Qué se prueba |
 |---|---|---|
 | Dominio | JUnit 5, AssertJ | Validaciones de `Franchise` y `Product` |

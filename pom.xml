@@ -18,6 +18,7 @@
 		<java.version>21</java.version>
 		<aws.sdk.version>2.57.11</aws.sdk.version>
 		<springdoc.version>3.2.0</springdoc.version>
+		<jacoco.version>0.8.16</jacoco.version>
 		<!-- Vacío por defecto; JaCoCo u otras herramientas pueden completarlo -->
 		<argLine></argLine>
 	</properties>
@@ -87,6 +88,33 @@
 					<execution>
 						<goals>
 							<goal>properties</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<!-- Cobertura de pruebas: reporte en target/site/jacoco/index.html -->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco.version}</version>
+				<configuration>
+					<excludes>
+						<!-- Clase de arranque de Spring Boot -->
+						<exclude>**/DemoApplication.class</exclude>
+					</excludes>
+				</configuration>
+				<executions>
+					<execution>
+						<id>prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
 						</goals>
 					</execution>
 				</executions>
